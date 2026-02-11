@@ -3,7 +3,7 @@ from discord.ext import commands
 import requests       
 import yt_dlp
 import os
-import asyncio
+
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -47,100 +47,43 @@ async def leave (ctx):
         await ctx.voice_client.disconnect()
 
 #--------------------Música--------------------
-class MusicCog(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-        self.queues = {}  # {guild_id: [songs]}
+@bot.command()
+async def play(ctx, *, search):
+    if not ctx.author.voice:
+        return await ctx.send("Debes estar en un canal de voz 😪")
+    
+    if not ctx.voice_client:
+        await ctx.author.voice.channel.connect()
+    
+    vc = ctx.voice_client
 
-    def ensure_voice(self, ctx):
-        if not ctx.author.voice:
-            raise commands.CommandError("¡Debes estar en un canal de voz!")
-        return ctx.author.voice.channel
-
-    async def ensure_voice_client(self, ctx):
-        if ctx.voice_client and ctx.voice_client.is_connected():
-            return ctx.voice_client
-        voice_channel = self.ensure_voice(ctx)
-        vc = await voice_channel.connect()
-        return vc
-
-    async def get_song_url(self, search):
-        loop = asyncio.get_event_loop()
-        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-            info = await loop.run_in_executor(ydl.extract_info, f"ytsearch:{search}", download=False)
-            return info["entries"][0]["url"]
-
-    async def play_next(self, ctx):
-        guild_id = ctx.guild.id
-        if guild_id not in self.queues or not self.queues[guild_id]:
-            return
-
-        url = self.queues[guild_id].pop(0)
-        vc = ctx.voice_client
-        source = discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS)
-        vc.play(source, after=lambda e: self.bot.loop.create_task(self.play_next(ctx)))
-
-    @commands.command(name="play")
-    async def play(self, ctx, *, search):
-        vc = await self.ensure_voice_client(ctx)
-        
-        if vc.is_playing() or vc.is_paused():
-            guild_id = ctx.guild.id
-            if guild_id not in self.queues:
-                self.queues[guild_id] = []
-            
-            url = await self.get_song_url(search)
-            self.queues[guild_id].append(url)
-            return await ctx.send(f"**Agregado a la cola** 🎵 (Posición: {len(self.queues[guild_id])})")
-
-        url = await self.get_song_url(search)
-        source = discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS)
-        vc.play(source, after=lambda e: self.bot.loop.create_task(self.play_next(ctx)))
-        await ctx.send(f"**Reproduciendo ahora** ▶️ `{search}`")
-
-    @commands.command(name="skip")
-    async def skip(self, ctx):
-        vc = ctx.voice_client
-        if not vc or not vc.is_playing():
-            return await ctx.send("❌ Nada reproduciendo.")
-
+    with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+        info = ydl.extract_info(f"ytsearch:{search}", download=False)
+        url = info["entries"][0]["url"]
+    
+    if vc.is_playing():
         vc.stop()
-        await ctx.send("⏭ **Saltada**")
+    
+    vc.play(discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS))
+    await ctx.send (f"reproduciendo 🎶: **{search}**")
 
-    @commands.command(name="queue", aliases=["q"])
-    async def queue(self, ctx):
-        guild_id = ctx.guild.id
-        if guild_id not in self.queues or not self.queues[guild_id]:
-            return await ctx.send("📭 **Cola vacía**")
+@bot.command()
+async def pause(ctx):
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.pause()
 
-        embed = discord.Embed(title="📋 Cola de reproducción", color=0x00ff00)
-        for i, _ in enumerate(self.queues[guild_id]):
-            embed.add_field(name=f"{i+1}. Canción", value="Cargando...", inline=False)
-        await ctx.send(embed=embed)
 
-    @commands.command(name="clear")
-    async def clear(self, ctx):
-        guild_id = ctx.guild.id
-        if guild_id in self.queues:
-            self.queues[guild_id].clear()
-        await ctx.send("🗑 **Cola limpiada**")
+@bot.command()
+async def resume(ctx):
+    if ctx.voice_client and ctx.voice_client.is_paused():
+        ctx.voice_client.resume()
 
-    @commands.command(name="leave", aliases=["stop"])
-    async def leave(self, ctx):
-        vc = ctx.voice_client
-        if vc:
-            guild_id = ctx.guild.id
-            if guild_id in self.queues:
-                self.queues[guild_id].clear()
-            await vc.disconnect()
-            await ctx.send("👋 **Desconectado**")
-
-async def setup(bot):
-    await bot.add_cog(MusicCog(bot))
+@bot.command()
+async def stop(ctx):
+    if ctx.voice_client:
+        ctx.voice_client.stop()
 
     
-
-
 #--------------------POKEMON---------------
 
 @bot.command()
