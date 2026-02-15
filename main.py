@@ -4,18 +4,14 @@ import requests
 import yt_dlp
 import os
 
-
 from dotenv import load_dotenv
 load_dotenv()
-
 
 intents = discord.Intents.default()    
 intents.message_content = True
 
 bot = commands.Bot(command_prefix='$',intents=intents)
-
-
-
+queue = []
 
 
 YDL_OPTIONS = {
@@ -48,24 +44,53 @@ async def leave (ctx):
 
 #--------------------Música--------------------
 @bot.command()
-async def play(ctx, *, search):
+async def play(ctx, *, url):
     if not ctx.author.voice:
-        return await ctx.send("Debes estar en un canal de voz 😪")
-    
-    if not ctx.voice_client:
-        await ctx.author.voice.channel.connect()
-    
-    vc = ctx.voice_client
+        await ctx.send("No estás en un canal de voz.")
+        return
 
-    with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-        info = ydl.extract_info(f"ytsearch:{search}", download=False)
-        url = info["entries"][0]["url"]
-    
-    if vc.is_playing():
-        vc.stop()
-    
-    vc.play(discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS))
-    await ctx.send (f"reproduciendo 🎶: **{search}**")
+    channel = ctx.author.voice.channel
+
+    if ctx.voice_client is None:
+        await channel.connect()
+
+    voice_client = ctx.voice_client
+
+    queue.append(url)
+    await ctx.send(f"Agregado a la cola: {url}")
+
+    if not voice_client.is_playing():
+        await play_next(ctx)
+
+async def play_next(ctx):
+    if len(queue) > 0:
+        url = queue.pop(0)
+
+        source = await discord.FFmpegOpusAudio.from_probe(
+            url,
+            executable="ffmpeg"
+        )
+
+        ctx.voice_client.play(
+            source,
+            after=lambda e: bot.loop.create_task(play_next(ctx))
+        )
+
+@bot.command()
+async def queue(ctx):
+    if len(queue) == 0:
+        await ctx.send("La cola está vacía.")
+    else:
+        lista = "\n".join([f"{i+1}. {song}" for i, song in enumerate(queue)])
+        await ctx.send(f"🎵 Cola:\n{lista}")
+
+@bot.command()
+async def skip(ctx):
+    if ctx.voice_client:
+        ctx.voice_client.stop()
+        await ctx.send("⏭ Canción saltada.")
+
+
 
 @bot.command()
 async def pause(ctx):
