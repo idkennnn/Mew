@@ -15,6 +15,9 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='$',intents=intents)
 
 
+
+
+
 YDL_OPTIONS = {
     "format": "bestaudio",
     "quiet": True
@@ -114,7 +117,6 @@ async def limpiar(ctx):
 #--------------------Arranque--------------------
 TOKEN = os.getenv("TOKEN")
 bot.run(TOKEN)
-
 
 
 
