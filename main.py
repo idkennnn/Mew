@@ -31,6 +31,11 @@ FFMPEG_OPTIONS = {
 
 @bot.event
 async def on_ready():
+    import discord
+    print(f"discord.py {discord.__version__}")
+
+@bot.event
+async def on_ready():
     print(f"Estoy funcionando {bot.user}")
 
 #--------------------VOZ-------------------

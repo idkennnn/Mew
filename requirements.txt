@@ -1,6 +1,6 @@
-discord.py
-requests
-yt-dlp
-PyNaCl
-ffmpeg-python
-python-dotenv
+discord.py==2.6.4
+requests==2.32.5
+yt-dlp==2026.2.4
+PyNaCl==1.6.2
+ffmpeg-python==0.2.0
+python-dotenv==1.2.1
